@@ -1,0 +1,91 @@
+---
+title: "Pratical Machine Learning Course Project"
+author: "Moura"
+date: "Oct 24, 2015"
+output: html_document
+---
+
+## OVERVIEW:
+
+The objective of the project is to predict the manner in which the subjects did the exercise, from the "classe" variable. The data is about personal activity collected by the accelerometers from some devices, like Jawbone Up, Nike FuelBand, Fitbit. The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+
+
+## ANALYSIS
+
+
+
+## DATA PROCESSING
+
+```{r}
+library(caret)
+plmTesting = read.csv("pml-testing.csv")
+plmTraining = read.csv("pml-training.csv")
+
+```
+
+First let's look at the dimension of our data set:
+
+```{r}
+dim(plmTraining)
+dim(plmTesting)
+```
+
+##Data Pre-processing
+
+According to the documentation, the ballance of fields are numeric, so we casted the data into numeric, with the exception to the class column:
+
+```{r results='hide', message=FALSE, warning=FALSE}
+for(i in c(8:ncol(plmTraining)-1)){
+  plmTraining[,i] = as.numeric(as.character(plmTraining[,i]))
+  plmTesting[,i] = as.numeric(as.character(plmTesting[,i]))
+}
+```
+
+1- First we will delet the first column, which is the ID variable. Then, we will identify the NearZeroVariance variables and exclude them
+```{r}
+plmTraining = plmTraining[,-c(1)]
+NZV = nearZeroVar(plmTraining,saveMetrics=TRUE)
+plmTraining = plmTraining[,!NZV$nzv]
+dim(plmTraining)
+```
+
+2- Then we will delete the variables that have more than 60\% of their values NA's:
+```{r}
+provTraining = plmTraining
+for(i in 1:length(plmTraining)){
+  if(sum(is.na(plmTraining[,i]))/nrow(plmTraining) >= .6){
+    for(j in 1:length(provTraining)){
+      if(length(grep(names(plmTraining[i]),names(provTraining)[j]) == 1)){
+        provTraining = provTraining[,-j]
+      }
+    }
+  }
+}
+
+dim(provTraining)
+plmTraining = provTraining
+```
+
+
+As we have a large sample size, we are going to use 60\% of the sample for training, 20\% for testing and 20\% for validating:
+
+```{r}
+set.seed(1234)
+inTrain = createDataPartition(plmTraining$classe, p=0.6,list=FALSE)
+training = plmTraining[inTrain,]
+#This will create another partition of the 40% of the data, 20% testing and 20% validating
+totalValidationSet = plmTraining[-inTrain,]
+inValidation = createDataPartition(totalValidationSet$classe,p=0.5,list=FALSE)
+testing = totalValidationSet[inValidation,]
+validating = totalValidationSet[-inValidation,]
+rm(totalValidationSet,inValidation)
+```
+
+##Selecting model
+
+```{r}
+set.seed(32422)
+fitRf = train(classe~.,data=training,method="rf",prox=TRUE)
+predRf = predict(fitRf,testing)
+confusionMatrix(testing$classe,predictRf)
+```
